@@ -1,0 +1,288 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opencost
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opencost
+  namespace: opencost
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opencost
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - deployments
+  - nodes
+  - pods
+  - services
+  - resourcequotas
+  - replicationcontrollers
+  - limitranges
+  - persistentvolumeclaims
+  - persistentvolumes
+  - namespaces
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  - deployments
+  - daemonsets
+  - replicasets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: opencost
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: opencost
+subjects:
+- kind: ServiceAccount
+  name: opencost
+  namespace: opencost
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencost
+  namespace: opencost
+spec:
+  ports:
+  - name: opencost
+    port: 8080
+    targetPort: 9003
+  - name: opencost-ui
+    port: 80
+    targetPort: 9090
+  selector:
+    app: opencost
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencost-report
+  namespace: opencost
+spec:
+  ports:
+  - name: opencost
+    port: 80
+    targetPort: 9003
+  selector:
+    app: opencost
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: opencost
+  name: opencost
+  namespace: opencost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencost
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: opencost
+    spec:
+      containers:
+      - env:
+        - name: CLUSTER_ID
+          value: partner-0
+        - name: PROMETHEUS_SERVER_ENDPOINT
+          value: http://monitor-stack-kube-prometh-prometheus.monitoring.svc.cluster.local:9090
+        - name: CLOUD_PROVIDER_API_KEY
+          value: xxxxxx
+        image: quay.io/kubecost1/kubecost-cost-model:latest
+        imagePullPolicy: Always
+        name: opencost
+        resources:
+          limits:
+            cpu: 999m
+            memory: 1G
+          requests:
+            cpu: 10m
+            memory: 55M
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+        volumeMounts:
+        - mountPath: /var/secrets
+          name: service-key-secret
+        - mountPath: /mnt/tls-secrets-store
+          name: tls-secrets-store
+          readOnly: true
+      - image: quay.io/kubecost1/opencost-ui:1.105.2
+        imagePullPolicy: Always
+        name: opencost-ui
+        resources:
+          limits:
+            cpu: 999m
+            memory: 1G
+          requests:
+            cpu: 10m
+            memory: 55M
+      restartPolicy: Always
+      serviceAccountName: opencost
+      volumes:
+      - name: service-key-secret
+        secret:
+          secretName: azure-service-key
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: opencost-ingress-tls-cert
+        name: tls-secrets-store
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+  name: opencost-ingress
+  namespace: opencost
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: opencost.hub-test-02.hub.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: opencost
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - opencost.hub-test-02.hub.com
+    secretName: opencost-ingress-tls-cert
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+  name: opencost-report-ingress
+  namespace: opencost
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: opencost-report.hub-test-02.hub.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: opencost-report
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - opencost-report.hub-test-02.hub.com
+    secretName: opencost-ingress-tls-cert
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: opencost-ingress-tls-cert
+  namespace: opencost
+spec:
+  parameters:
+    keyvaultName: kvaksuks1hubshrnprd02
+    objects: |
+      array:
+        - |
+          objectName: hub-test-02-wild-cert
+          objectType: secret
+    tenantId: xxxxx-xxxx-xxxx-95bf-be08b76d457b
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: xxxx-xxxx-xxxx-8def-787655a8b43f
+  provider: azure
+  secretObjects:
+  - data:
+    - key: tls.crt
+      objectName: hub-test-02-wild-cert
+    - key: tls.key
+      objectName: hub-test-02-wild-cert
+    secretName: opencost-ingress-tls-cert
+    type: kubernetes.io/tls

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencost
+  namespace: opencost
+spec:
+  template:
+    spec:
+      containers:
+        - name: opencost
+          volumeMounts:
+            - mountPath: /var/secrets
+              name: service-key-secret
+            - name: tls-secrets-store
+              readOnly: true
+              mountPath: /mnt/tls-secrets-store
+          env:
+            - name: PROMETHEUS_SERVER_ENDPOINT
+              value: http://monitor-stack-kube-prometh-prometheus.monitoring.svc.cluster.local:9090
+        - name: opencost-ui
+          image: quay.io/kubecost1/opencost-ui:1.105.2
+      volumes:
+        - name: service-key-secret
+          secret:
+            secretName: azure-service-key
+        - name: tls-secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: opencost-ingress-tls-cert # Mounts the CSI Driver secret on the opencost pods so that the native K8s secrets contains the ingress TLS cert will be created

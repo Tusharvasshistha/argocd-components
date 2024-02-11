@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: opencost
+
+resources:
+  - opencost.yaml
+  - opencost-ingress.yaml
+  - opencost-report.yaml
+
+patches:
+  - path: patches/deployment.yaml
+  - target:
+      kind: Service
+      name: opencost
+      namespace: opencost
+    patch: |
+      - op: replace
+        path: /spec/ports/0/port
+        value: 8080
+      - op: replace
+        path: /spec/ports/1/port
+        value: 80
+

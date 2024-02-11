@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencost
+  namespace: opencost
+spec:
+  template:
+    spec:
+      containers:
+        - name: opencost
+          env:
+            - name: CLUSTER_ID
+              value: partner-0

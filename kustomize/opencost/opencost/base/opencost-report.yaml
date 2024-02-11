@@ -1,0 +1,44 @@
+# Expose the cost model with a service
+#
+# Without a Prometheus endpoint configured in the deployment,
+# only opencost/metrics will have useful data as it is intended
+# to be used as only an exporter.
+kind: Service
+apiVersion: v1
+metadata:
+  name: opencost-report
+  namespace: opencost
+spec:
+  selector:
+    app: opencost
+  type: ClusterIP
+  ports:
+    - name: opencost
+      port: 80
+      targetPort: 9003
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opencost-report-ingress
+  namespace: opencost
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/ssl-passthrough: 'true'
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: <REPLACE>
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: opencost-report
+                port:
+                  number: 80
+  tls:
+    - secretName: opencost-ingress-tls-cert
+      hosts:
+        - <REPLACE>

@@ -1,0 +1,26 @@
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: opencost-ingress-tls-cert
+  namespace: opencost
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: xxxx-xxx-xxx-xxx-787655a8b43f
+    tenantId: xxxx-xx-xxx-xxx-be08b76d457b
+    keyvaultName: kvaksuks1hubshrnprd02
+    objects: |
+      array:
+        - |
+          objectName: hub-test-02-wild-cert
+          objectType: secret
+  secretObjects:
+  - secretName: opencost-ingress-tls-cert
+    type: kubernetes.io/tls
+    data:
+    - key: tls.crt
+      objectName: hub-test-02-wild-cert
+    - key: tls.key
+      objectName: hub-test-02-wild-cert
