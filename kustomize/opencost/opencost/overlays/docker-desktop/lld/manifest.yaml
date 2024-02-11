@@ -160,7 +160,7 @@ spec:
         - name: PROMETHEUS_SERVER_ENDPOINT
           value: http://monitor-stack-kube-prometh-prometheus.monitoring.svc.cluster.local:9090
         - name: CLOUD_PROVIDER_API_KEY
-          value: xxxxxx
+          value: xxxx
         image: quay.io/kubecost1/kubecost-cost-model:latest
         imagePullPolicy: Always
         name: opencost
@@ -273,10 +273,10 @@ spec:
         - |
           objectName: hub-test-02-wild-cert
           objectType: secret
-    tenantId: xxxxx-xxxx-xxxx-95bf-be08b76d457b
+    tenantId: xxxx-xx-xxx-xxx-be08b76d457b
     usePodIdentity: "false"
     useVMManagedIdentity: "true"
-    userAssignedIdentityID: xxxx-xxxx-xxxx-8def-787655a8b43f
+    userAssignedIdentityID: xxxx-xxx-xxx-xxx-787655a8b43f
   provider: azure
   secretObjects:
   - data:
